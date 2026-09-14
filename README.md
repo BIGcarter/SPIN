@@ -75,6 +75,127 @@ The default observational products are located in the parent directory:
 
 Each file contains equal-length arrays named `x`, `y`, `v`, and `flux`. The points are channel-by-channel dendrogram-leaf centroids, while `flux` is the corresponding integrated leaf flux.
 
+## End-to-End Workflow: Cube to Checked Fit
+
+The fitting step should start only after the spectral cube, extracted peaks, and any region selection have been checked visually. The recommended loop is:
+
+```text
+full cube -> velocity subcube -> channel peaks + moment maps
+          -> peak overlay check -> optional DS9 region selection
+          -> AU/relative-velocity PPV -> nested-sampling fit
+          -> moment 0/1 + peaks + fitted-trajectory check
+```
+
+The commands below assume the current directory is `lb/model/` and use the `astro` conda environment. Replace the HNCO paths, rest frequency, velocity range, RMS, and region file for the line being analyzed. All processing scripts also support `-h`; CLI arguments override their top-level configuration blocks.
+
+### 1. Cut the line cube
+
+Choose a velocity interval wide enough to include the line and nearby line-free channels:
+
+```bash
+python ../cut-subcube.py \
+  ../09018-spw2.fits ../data/HNCO/HNCO-cut.fits \
+  --restfreq-ghz 219.798274 \
+  --velocity-range-kms -10 30
+```
+
+Check the printed input/output channel ranges and spectral-axis limits before continuing. Do not use `--overwrite` unless replacing an existing product is intentional.
+
+### 2. Find channel-by-channel peaks and make the first check plots
+
+`prepare-peak.py` masks the cube for moment 0/1, runs a 2-D dendrogram independently in each selected channel, and writes the peak table and diagnostic figures:
+
+```bash
+python ../prepare-peak.py \
+  ../data/HNCO/HNCO-cut.fits \
+  --molname HNCO \
+  --restfreq-ghz 219.798274 \
+  --rms 8.8e-4 \
+  --channel-range 20 40 \
+  --moment-mask-sigma 5 \
+  --dendro-min-value-sigma 5 \
+  --dendro-min-delta-sigma 1 \
+  --auto-min-npix \
+  --plot-center 76 75 \
+  --plot-size 100 140 \
+  --output-root ../data
+```
+
+This creates, under `../data/HNCO/`:
+
+- `HNCO-prepared-peaks.npz` with `x`, `y`, `v`, `flux`, pixel coordinates, channel indices, and provenance metadata;
+- `HNCO-prepared-mom0.fits` and `HNCO-prepared-mom1.fits`;
+- `HNCO-prepared-peaks-on-mom01.png`, the main peak-on-moment-map check;
+- `HNCO-aoi-average-spectrum.png`, for checking the chosen channel/velocity interval.
+
+Inspect both PNG files. Confirm that the selected channels contain the intended transition, peaks follow real compact emission rather than noise/sidelobes, the moment mask is sensible, and obvious unrelated structures are not entering the fit. If the result is poor, adjust the RMS, channel range, dendrogram thresholds, minimum area, or plot area and regenerate the products before fitting. `prepare-peak-3d.py` is an alternative when a 3-D PPV dendrogram and leaf centroids are more appropriate than independent 2-D channel peaks.
+
+### 3. Select the desired streamer and convert to fitting coordinates
+
+Draw one or more include/exclude regions in DS9 after examining the peak overlay, then apply them with `mask_peak.py`. The current project convention is center pixel `(76, 75)`, distance `2600 pc`, and systemic velocity `10 km/s`:
+
+```bash
+python ../mask_peak.py \
+  ../data/HNCO/HNCO-prepared-peaks.npz \
+  ../data/HNCO/HNCO-prepared-mom0.fits \
+  ../HNCO-north.reg \
+  --output-npz ../data/HNCO/HNCO-north-masked.npz \
+  --output-figure ../data/HNCO/HNCO-north-masked-overlay-au.png \
+  --output-au-relative-npz ../data/HNCO/HNCO-north-masked-au-relative-vsys.npz \
+  --distance-pc 2600 \
+  --center-xy 76 75 \
+  --vsys 10
+```
+
+The region argument may be omitted to retain all peaks. Always inspect the resulting overlay and the reported input/selected counts. For fitting, use the `*-au-relative-vsys.npz` product: `x` and `y` are offsets in AU from the adopted center, while `v = v_absolute - vsys` in km/s. Repeat this step with separate regions for north/south or blue/red components when fitting lobes separately or jointly.
+
+### 4. Configure and run the fit
+
+Before a production run, edit the fitting script's top-level configuration and verify at least:
+
+- `OBS_DATA` (or `OBS_DATA_BLUE` and `OBS_DATA_RED`) points to the checked `*-au-relative-vsys.npz` file(s);
+- `PARAM_CONFIG` has physically justified fixed values and prior ranges;
+- `SAVE_SUFFIX` is unique;
+- `SIGMA_XY`, `SIGMA_V`, flux-weight settings, trajectory limits, and sampler settings are intentional.
+
+Run cheap checks first, then start the selected fit from `lb/model/` so the existing relative data paths resolve correctly:
+
+```bash
+python -m py_compile \
+  streamer_ic.py streamer_model.py fit_streamer_ns_v2.py
+python fit_streamer_ns_v2.py
+```
+
+Use `fit_streamer_ns_combine.py` for a joint two-lobe fit. Production nested sampling can be expensive; a syntax/import or short trajectory check is not a substitute for validating the observational peak selection.
+
+### 5. Plot and inspect the fitted trajectory
+
+The fit writes `results/ns_trajectory<SAVE_SUFFIX>.npz` together with the sampling summary, trace, corner, and interactive best-fit plots. Overlay the final trajectory on the moment maps and the exact PPV points used by the fit:
+
+```bash
+python ../plot-traj-au.py \
+  ../data/HNCO/HNCO-prepared-mom0.fits \
+  ../data/HNCO/HNCO-prepared-mom1.fits \
+  --peak-npz ../data/HNCO/HNCO-north-masked-au-relative-vsys.npz \
+  --trajectory-npz results/ns_trajectory_hnco_north.npz \
+  --distance-pc 2600 \
+  --center-xy 76 75 \
+  --vsys 10 \
+  --output ../data/HNCO/HNCO-north-fit-review.png
+```
+
+For multiple lobes, pass all peak files after `--peak-npz` and all matching trajectory files after `--trajectory-npz`. Use `--trajectory-slice-stops STOP ...` only when a documented physical or display reason justifies truncating a trajectory.
+
+Final acceptance should include all of the following checks:
+
+- peaks and trajectory occupy the intended structure in moment 0;
+- the peak and trajectory colors agree with the absolute-velocity field in moment 1;
+- the trajectory covers the PPV trend without relying on a few high-flux points;
+- trace/corner plots and effective-sample/evidence diagnostics do not show an obviously unfinished or boundary-dominated fit;
+- center, distance, systemic velocity, input NPZ, priors, and `SAVE_SUFFIX` are recorded consistently.
+
+If any check fails, return to the relevant earlier stage—peak thresholds/channel range, DS9 region, coordinate conversion, or fit priors—and write a new output name rather than silently overwriting the previous experiment.
+
 PPV distances are normalized by default as:
 
 ```text
