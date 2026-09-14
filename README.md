@@ -7,9 +7,7 @@ Fitting scripts are configured through top-level constants; inspect all priors, 
 ## Quick Start
 
 ```bash
-python run_streamer_model.py          # Integrate and visualize one trajectory
 python fit_streamer_ns_v2.py    # Current single-lobe dynamic nested sampling
-python fit_streamer_ns_combine.py     # Joint blue/red dynamic nested sampling
 ```
 
 The nested-sampling configurations use many live points and can run for a long time. For development, prefer `python -m py_compile`, imports, and one short trajectory or likelihood evaluation. Do not start a production sampling run as a smoke test.
@@ -93,7 +91,7 @@ The commands below assume the current directory is `lb/model/` and use the `astr
 Choose a velocity interval wide enough to include the line and nearby line-free channels:
 
 ```bash
-python ../cut-subcube.py \
+python ./cut-subcube.py \
   ../09018-spw2.fits ../data/HNCO/HNCO-cut.fits \
   --restfreq-ghz 219.798274 \
   --velocity-range-kms -10 30
@@ -106,7 +104,7 @@ Check the printed input/output channel ranges and spectral-axis limits before co
 `prepare-peak.py` masks the cube for moment 0/1, runs a 2-D dendrogram independently in each selected channel, and writes the peak table and diagnostic figures:
 
 ```bash
-python ../prepare-peak.py \
+python ./prepare-peak.py \
   ../data/HNCO/HNCO-cut.fits \
   --molname HNCO \
   --restfreq-ghz 219.798274 \
