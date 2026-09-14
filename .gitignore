@@ -16,7 +16,12 @@
 __pycache__/
 .tmp/
 docs/
+results/
+legacy/
+tmp/
 
 ./channel-peak.ipynb
+
+.gitignore
 
 ./AGENTS.md

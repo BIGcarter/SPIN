@@ -104,7 +104,7 @@ def eq_streamer(t, Y, GM, drag_func=None):
     Y : array_like, shape (6,)
         State vector [x, y, z, vx, vy, vz].
     GM : float
-        Gravitational parameter in km²/s²·AU.
+        Gravitational parameter in km2/s2 AU.
     drag_func : callable or None
         drag_func(t, x, y, z, vx, vy, vz) -> (ax_drag, ay_drag, az_drag).
         If None, no drag is applied (pressureless).

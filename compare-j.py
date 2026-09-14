@@ -22,9 +22,9 @@ mpl.rcParams['font.family'] = 'serif'
 # FILE_2 = 'angular_momentum_red_samples.npz'
 
 # NS
-FILE_1 = 'angular_momentum_ns_no_pressure_M_26_z_100_north.npz'
+FILE_1 = 'results/angular_momentum_ns_north_0825.npz'
 # FILE_2 = 'angular_momentum_ns_no_pressure_south.npz'
-FILE_2 = "angular_momentum_ns_no_pressure_M_26_south_codex.npz"
+FILE_2 = "results/angular_momentum_ns_south_0825.npz"
 
 LABEL_1 = 'North'
 LABEL_2 = 'South'
@@ -65,9 +65,9 @@ RESCALE_HIST = True     # independently scale 1D KDE heights
 
 # NS
 HIST_SCALE = [
-    (0.4, 1, 1),   # |j|
-    (0.3, 1, 1),   # θ_j
-    (0.3, 1, 1),   # φ_j
+    (0.3, 1, 1),   # |j|
+    (1, 1, 1),   # θ_j
+    (0.7, 1, 1),   # φ_j
 ]
 
 PLOT_NET = False  # if True, compute & overplot j_blue + j_red via independent draws

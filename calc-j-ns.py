@@ -27,16 +27,16 @@ mpl.rcParams['font.family'] = 'serif'
 # SAMPLES_FILE = 'ns_samples_no_pressure_north.npz'
 # SAMPLES_FILE = 'ns_samples_no_pressure_south.npz'
 # SAMPLES_FILE = 'ns_samples_no_pressure_M_26south_codex_v2.npz'
-SAMPLES_FILE = 'ns_samples_south_final_v4_fluxw.npz'
+SAMPLES_FILE = 'results/ns_samples_south_0825_v3.npz'
 # SAMPLES_FILE = 'ns_samples_no_pressure_M_26_north.npz'
-SAVE_SUFFIX = '_south_fluxwt'
+SAVE_SUFFIX = '_south_0825'
 
 N_SUBSAMPLE = 0           # 0 = use all; >0 = random subsample (for speed)
 
 SMOOTH_1D = True
 SHOW_BEST_FIT = True
 BINS = 30
-COLOR = 'steelblue'        # north: steelblue  red: lightsalmon
+COLOR = 'lightsalmon'        # north: steelblue  red: lightsalmon
 TITLE_FONT_SIZE = 11
 LABEL_FONT_SIZE = 15
 DPI = 150
@@ -44,9 +44,9 @@ DPI = 150
 OUTPUT_PREFIX = 'angular_momentum_ns'
 
 # Constants matching fit_streamer_ns.py PARAM_CONFIG defaults
-X_FIXED = -500.0
-Y_FIXED = 1300.0
-M_STAR = 10.0              # not used for j (purely kinematic)
+X_FIXED = -440.0
+Y_FIXED = -1000.0
+M_STAR = 26.0              # not used for j (purely kinematic)
 
 # Free parameter names (order must match the samples columns)
 # Current: z, v_r, omega, theta_axis, phi_axis

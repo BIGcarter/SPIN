@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 import numpy as np
-import astropy.units as u
 from scipy.spatial import KDTree
 import multiprocessing as mp
 import copy
@@ -19,16 +18,16 @@ from visual_orbit import plot_orbit
 # ============================================================
 
 PARAM_CONFIG = {
-    'z':           {'is_constant': False, 'prior_range': [0, 2000],       'label': r'$z$ [AU]'},  # 0, 1500 north
+    'z':           {'is_constant': False, 'prior_range': [-1000, 0],       'label': r'$z$ [AU]'},  # 0, 1500 north
     'v_r':         {'is_constant': False, 'prior_range': [-10, 1],        'label': r'$v_r$ [km/s]'},
     'omega':       {'is_constant': False, 'prior_range': [-6, -3], 'log_uniform': True, 'label': r'$\log_{10}(\omega)$ [round/yr]'},
-    'theta_axis':  {'is_constant': False, 'prior_range': [0, 60],         'label': r'$\theta_{axis}$ [deg]'},
-    'phi_axis':    {'is_constant': False, 'prior_range': [60, 180],        'label': r'$\phi_{axis}$ [deg]'},
+    'theta_axis':  {'is_constant': False, 'prior_range': [0, 90],         'label': r'$\theta_{axis}$ [deg]'},
+    'phi_axis':    {'is_constant': False, 'prior_range': [20, 180],        'label': r'$\phi_{axis}$ [deg]'},
     'M':           {'is_constant': True,  'value': 26,                  'label': r'$M$ [$M_\odot$]'},
     # 'alpha':       {'is_constant': True,  'value': 500,                 'label': r'$\alpha$'},
     'alpha':       {'is_constant': True,  'value': 1e5,                 'label': r'$\alpha$'},
-    'x':           {'is_constant': True,  'value': -700,                'label': r'$x$ [AU]'},
-    'y':           {'is_constant': True,  'value': 1300,                'label': r'$y$ [AU]'},   # north -700, 1300 south -440 -1000
+    'x':           {'is_constant': True,  'value': -50,                'label': r'$x$ [AU]'},
+    'y':           {'is_constant': True,  'value': -750,                'label': r'$y$ [AU]'},   # north -50, 1000 south -50 -750
 }
 
 NLIVE_INIT = 2500
@@ -42,16 +41,12 @@ CHECKPOINT_EVERY = 600
 
 T_SPAN = (0, 3000)
 T_EVAL = np.linspace(T_SPAN[0], T_SPAN[1], 1200)
-# The ODE state uses positions in AU and velocities in km/s, so one numeric
-# integration-time unit is AU / (km/s).  Convert that unit to years when
-# exposing or saving trajectory times.
-INTEGRATION_TIME_TO_YR = (1.0 * u.au / (u.km / u.s)).to_value(u.yr)
 STOPPING_R = 150.0
-AZIMUTH_MAX_DELTA_DEG = 360.0
+AZIMUTH_MAX_DELTA_DEG = 70.0
 
 # OBS_DATA = '../data/CH3OH/CH3OH-CH3CN-south-masked-2600pc-center76-75-vsys10-au-relative-vsys.npz'
-OBS_DATA = '../data/CH3OH/CH3OH-prepared-peaks-unmasked-au-relative-vsys.npz'
-SAVE_SUFFIX = '_circle_0827'
+OBS_DATA = '../data/HNCO/HNCO-south-masked-2600pc-center76-75-vsys10-au-relative-vsys.npz'
+SAVE_SUFFIX = '_HNCO_south_0908_v3'
 RESULTS_DIR = Path(__file__).resolve().parent / 'results'
 SIGMA_XY = 60.0
 SIGMA_V = 1.331
@@ -167,23 +162,21 @@ def compute_trajectory(params):
     r0 = np.sqrt(x0**2 + y0**2 + z0**2)
     E0 = 0.5 * (vx0**2 + vy0**2 + vz0**2) - GM / r0
     if E0 >= 0:
-        return None, None, None, None, None
+        return None, None, None, None
 
     try:
         sol = integrate_trajectory(initial_state, T_SPAN, T_EVAL, GM, drag_func, events=stopping_sphere(STOPPING_R))
         if not sol.success:
-            return None, None, None, None, None
-        t_yr = sol.t.copy() * INTEGRATION_TIME_TO_YR
+            return None, None, None, None
         x_arr = sol.y[0].copy()
         y_arr = sol.y[1].copy()
         z_arr = sol.y[2].copy()
         v_arr = sol.y[5].copy()
 
         cut = azimuth_cutoff_idx(x_arr, y_arr, max_delta_deg=AZIMUTH_MAX_DELTA_DEG)
-        return (t_yr[:cut+1], x_arr[:cut+1], y_arr[:cut+1],
-                z_arr[:cut+1], v_arr[:cut+1])
+        return x_arr[:cut+1], y_arr[:cut+1], z_arr[:cut+1], v_arr[:cut+1]
     except Exception:
-        return None, None, None, None, None
+        return None, None, None, None
 
 
 # ============================================================
@@ -243,7 +236,7 @@ def log_likelihood(theta):
     params = _theta_to_params(theta)
 
     try:
-        _, traj_x, traj_y, traj_z, traj_v = compute_trajectory(params)
+        traj_x, traj_y, traj_z, traj_v = compute_trajectory(params)
     except Exception:
         return -np.inf
 
@@ -384,7 +377,7 @@ if __name__ == '__main__':
         print(f'  {name} = {params_bf[name]:.4g}')
     print(f'  lnZ = {logz:.3f} +/- {logzerr:.3f}')
 
-    traj_t_yr, traj_x, traj_y, traj_z, traj_v = compute_trajectory(params_bf)
+    traj_x, traj_y, traj_z, traj_v = compute_trajectory(params_bf)
     if traj_x is None:
         print('WARNING: Best-fit trajectory computation failed!')
         sys.exit(1)
@@ -399,7 +392,7 @@ if __name__ == '__main__':
     for idx in idx_samples:
         p = equal_samples[idx]
         pm = _theta_to_params(p)
-        _, tx, ty, tz, tv = compute_trajectory(pm)
+        tx, ty, tz, tv = compute_trajectory(pm)
         if tx is not None:
             multi_trajs.append((tx, ty, tz, tv))
     print(f'Posterior trajectories: {len(multi_trajs)}/{min(N_LINES, len(equal_samples))} computed')
@@ -425,7 +418,6 @@ if __name__ == '__main__':
 
     trajectory_path = RESULTS_DIR / f'ns_trajectory{SAVE_SUFFIX}.npz'
     np.savez(trajectory_path,
-             t_yr=traj_t_yr,
              x=traj_x, y=traj_y, z=traj_z, v_los=traj_v,
              params=q,
     )
